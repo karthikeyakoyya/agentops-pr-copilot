@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentops-sdk"
+version = "0.1.0"
+description = "Platform-agnostic, governed LangGraph agent SDK, with a PR Copilot reference agent for automated SDLC code review."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "langgraph>=0.2.60",
+    "langchain-core>=0.3.28",
+    "langchain-anthropic>=0.3.3",
+    "langchain-openai>=0.2.14",
+    "langchain-chroma>=0.1.4",
+    "langchain-huggingface>=0.1.2",
+    "sentence-transformers>=3.3.1",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
+    "pydantic>=2.9.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3.0", "httpx>=0.27.0"]
+
+[tool.setuptools.packages.find]
+include = ["agentops*"]

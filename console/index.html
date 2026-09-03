@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AgentOps · PR Copilot Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #10141a;
+    --panel: #171d26;
+    --panel-raised: #1c232e;
+    --line: #262e3a;
+    --text: #e7ecf3;
+    --text-dim: #8793a6;
+    --text-faint: #57616f;
+    --trace: #4fd8c4;
+    --trace-dim: #2a5a54;
+    --amber: #e8a33d;
+    --amber-dim: #4a3a20;
+    --rose: #e2607a;
+    --rose-dim: #4a2530;
+    --green: #6fcf97;
+    --green-dim: #23422f;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 28px 24px 64px;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 28px;
+  }
+
+  header .wordmark {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+  header .wordmark span { color: var(--text-dim); font-weight: 400; }
+
+  .demo-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    color: var(--amber);
+    border: 1px solid var(--amber-dim);
+    padding: 4px 9px;
+    border-radius: 3px;
+    background: rgba(232, 163, 61, 0.06);
+  }
+
+  .hero-line {
+    font-size: 21px;
+    line-height: 1.5;
+    max-width: 640px;
+    color: var(--text);
+    margin: 0 0 26px;
+    font-weight: 400;
+  }
+
+  /* ---- graph panel ---- */
+  .graph-panel {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 4px 4px 0;
+    margin-bottom: 22px;
+    overflow: hidden;
+  }
+
+  .graph-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .scenario-toggle {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .scenario-toggle button {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    background: transparent;
+    color: var(--text-dim);
+    border: none;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+  .scenario-toggle button.active {
+    background: var(--panel-raised);
+    color: var(--text);
+  }
+  .scenario-toggle button:not(:last-child) { border-right: 1px solid var(--line); }
+
+  .run-btn {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #0c1116;
+    background: var(--trace);
+    border: none;
+    padding: 9px 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: transform 0.08s ease;
+  }
+  .run-btn:hover { transform: translateY(-1px); }
+  .run-btn:disabled { opacity: 0.45; cursor: default; transform: none; }
+
+  .run-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .run-status .dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    margin-right: 7px;
+    vertical-align: middle;
+  }
+  .run-status.live .dot { background: var(--trace); box-shadow: 0 0 8px var(--trace); }
+  .run-status.amber .dot { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+  .run-status.rose .dot { background: var(--rose); box-shadow: 0 0 8px var(--rose); }
+  .run-status.green .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+  svg#trace-svg { display: block; width: 100%; height: auto; }
+
+  .node-circle {
+    fill: var(--panel-raised);
+    stroke: var(--line);
+    stroke-width: 1.5;
+    cursor: pointer;
+    transition: stroke 0.25s ease, fill 0.25s ease;
+  }
+  .node-circle.active { stroke: var(--trace); fill: var(--trace-dim); }
+  .node-circle.amber-active { stroke: var(--amber); fill: var(--amber-dim); }
+  .node-circle.rose-active { stroke: var(--rose); fill: var(--rose-dim); }
+  .node-circle.green-active { stroke: var(--green); fill: var(--green-dim); }
+  .node-circle.visited { stroke: var(--text-faint); }
+  .node-circle:hover { stroke: var(--text-dim); }
+
+  .node-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    fill: var(--text-dim);
+    pointer-events: none;
+  }
+  .node-label.active-label { fill: var(--text); }
+
+  .node-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    fill: var(--text-faint);
+    pointer-events: none;
+  }
+
+  .edge-path {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1.5;
+  }
+  .edge-path.dashed { stroke-dasharray: 3 4; }
+
+  .pulse {
+    fill: var(--trace);
+    filter: drop-shadow(0 0 5px var(--trace));
+    opacity: 0;
+  }
+
+  /* ---- detail row ---- */
+  .detail-row {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 780px) {
+    .detail-row { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 16px 18px 18px;
+  }
+
+  .panel h2 {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-dim);
+    margin: 0 0 12px;
+    letter-spacing: 0.01em;
+  }
+
+  #step-detail-content {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--text);
+    white-space: pre-wrap;
+    margin: 0;
+    min-height: 132px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  #step-detail-content .dim { color: var(--text-dim); }
+
+  #audit-ticker {
+    max-height: 220px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .audit-line {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    line-height: 1.5;
+    padding: 6px 0 6px 10px;
+    border-left: 2px solid var(--text-faint);
+    color: var(--text-dim);
+  }
+  .audit-line b { color: var(--text); font-weight: 500; }
+  .audit-line.allow { border-color: var(--trace); }
+  .audit-line.pending { border-color: var(--amber); }
+  .audit-line.deny { border-color: var(--rose); }
+  .audit-line.approve { border-color: var(--green); }
+
+  /* ---- eval panel ---- */
+  .eval-panel { margin-bottom: 16px; }
+  svg#eval-chart { width: 100%; height: auto; display: block; }
+  .eval-bar-label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; fill: var(--text-dim); }
+  .eval-bar-value { font-family: 'IBM Plex Mono', monospace; font-size: 11px; fill: var(--text); }
+  .eval-note {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+    margin: 10px 0 0;
+  }
+
+  /* ---- approval panel ---- */
+  .approval-panel { margin-bottom: 8px; }
+  .approval-empty {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--text-faint);
+  }
+  .approval-card {
+    border: 1px solid var(--amber-dim);
+    background: rgba(232, 163, 61, 0.05);
+    border-radius: 3px;
+    padding: 14px 16px;
+  }
+  .approval-card .role-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--amber);
+    border: 1px solid var(--amber-dim);
+    border-radius: 3px;
+    padding: 2px 7px;
+    margin-bottom: 10px;
+    display: inline-block;
+  }
+  .approval-card pre {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--text);
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 10px 12px;
+    white-space: pre-wrap;
+    margin: 0 0 14px;
+  }
+  .approval-actions { display: flex; gap: 10px; }
+  .approval-actions button {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 3px;
+    padding: 8px 16px;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  #approve-btn { background: var(--green); color: #0c1116; }
+  #deny-btn { background: transparent; color: var(--rose); border-color: var(--rose-dim); }
+  .approval-actions button:disabled { opacity: 0.4; cursor: default; }
+
+  .resolution-note {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    padding: 12px 14px;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+  }
+  .resolution-note.approved { border-color: var(--green-dim); color: var(--green); }
+  .resolution-note.denied { border-color: var(--rose-dim); color: var(--rose); }
+
+  footer {
+    margin-top: 30px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    color: var(--text-faint);
+  }
+  footer a { color: var(--text-dim); text-decoration: none; border-bottom: 1px dotted var(--text-faint); }
+  footer a:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="wordmark">AgentOps <span>· PR Copilot console</span></div>
+    <div class="demo-badge">Demo mode — example agent output, not a live backend connection</div>
+  </header>
+
+  <p class="hero-line">Every fix this agent proposes gets tested, checked against a risk guardrail, and approved by a human before it touches your repo.</p>
+
+  <div class="graph-panel">
+    <div class="graph-toolbar">
+      <div class="scenario-toggle">
+        <button id="scenario-safe" class="active">Safe fix</button>
+        <button id="scenario-risky">Risky fix (blocked)</button>
+      </div>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <span class="run-status mono" id="run-status"><span class="dot"></span>idle</span>
+        <button class="run-btn" id="run-btn">Run demo review ▸</button>
+      </div>
+    </div>
+    <svg id="trace-svg" viewBox="0 0 1000 260" preserveAspectRatio="xMidYMid meet"></svg>
+  </div>
+
+  <div class="detail-row">
+    <div class="panel">
+      <h2>Step detail</h2>
+      <pre id="step-detail-content" class="mono">Click a node above to inspect it, or press "Run demo review" to watch a full pass.</pre>
+    </div>
+    <div class="panel">
+      <h2>Governance &amp; audit trail</h2>
+      <div id="audit-ticker"></div>
+    </div>
+  </div>
+
+  <div class="panel eval-panel">
+    <h2>Eval scenarios — from eval_harness.py</h2>
+    <svg id="eval-chart" viewBox="0 0 940 168" preserveAspectRatio="xMidYMid meet"></svg>
+    <p class="eval-note">latency + outcome per fixed scenario, captured via graph.stream(stream_mode="updates") — same harness ships in the backend repo</p>
+  </div>
+
+  <div class="panel approval-panel">
+    <h2>Human approval queue</h2>
+    <div id="approval-content"><p class="approval-empty">No fix awaiting review yet — run the demo above.</p></div>
+  </div>
+
+  <footer>
+    <span>agentops-sdk · LangGraph · FastAPI · Chroma</span>
+    <span>backend repo: <a href="../README.md">README.md</a></span>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Node layout (matches agentops/agents/pr_copilot.py's graph)
+  // ---------------------------------------------------------------
+  const NODES = {
+    agent:      { x: 130, y: 130, r: 34, label: "agent",           num: 1 },
+    retrieve:   { x: 330, y: 55,  r: 30, label: "retrieve_context", num: 2 },
+    run_tests:  { x: 330, y: 205, r: 30, label: "run_tests",        num: 3 },
+    guardrail:  { x: 550, y: 130, r: 32, label: "guardrail_check",  num: 4 },
+    human_gate: { x: 770, y: 60,  r: 32, label: "human approval",   num: 5 },
+    blocked:    { x: 770, y: 210, r: 30, label: "blocked",          num: null },
+    apply_fix:  { x: 960, y: 30,  r: 30, label: "apply_fix",        num: 6 },
+    denied:     { x: 960, y: 130, r: 30, label: "denied",           num: null },
+  };
+
+  const EDGES = [
+    ["agent", "retrieve"], ["retrieve", "agent"],
+    ["agent", "run_tests"], ["run_tests", "agent"],
+    ["agent", "guardrail"],
+    ["guardrail", "human_gate"],
+    ["guardrail", "blocked", true],
+    ["human_gate", "apply_fix"],
+    ["human_gate", "denied", true],
+  ];
+
+  const svg = document.getElementById("trace-svg");
+  const NS = "http://www.w3.org/2000/svg";
+
+  function el(tag, attrs) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  function edgePath(a, b) {
+    const dx = (b.x - a.x) * 0.5;
+    return `M ${a.x} ${a.y} C ${a.x + dx} ${a.y}, ${b.x - dx} ${b.y}, ${b.x} ${b.y}`;
+  }
+
+  // draw edges
+  const edgeEls = {};
+  EDGES.forEach(([from, to, dashed]) => {
+    const a = NODES[from], b = NODES[to];
+    const p = el("path", {
+      class: "edge-path" + (dashed ? " dashed" : ""),
+      d: edgePath(a, b),
+    });
+    svg.appendChild(p);
+    edgeEls[from + ">" + to] = p;
+  });
+
+  // draw nodes
+  const nodeEls = {};
+  Object.entries(NODES).forEach(([key, n]) => {
+    const g = el("g", { "data-node": key, style: "cursor:pointer" });
+    const circle = el("circle", { class: "node-circle", cx: n.x, cy: n.y, r: n.r });
+    g.appendChild(circle);
+    if (n.num) {
+      const num = el("text", { class: "node-num", x: n.x, y: n.y - 6, "text-anchor": "middle" });
+      num.textContent = n.num;
+      g.appendChild(num);
+    }
+    const label = el("text", {
+      class: "node-label",
+      x: n.x,
+      y: n.y + (n.num ? 8 : 4),
+      "text-anchor": "middle",
+    });
+    label.textContent = n.label;
+    g.appendChild(label);
+    g.addEventListener("click", () => showStepDetail(key, false));
+    svg.appendChild(g);
+    nodeEls[key] = { g, circle, label };
+  });
+
+  const pulse = el("circle", { class: "pulse", r: 5 });
+  svg.appendChild(pulse);
+
+  // ---------------------------------------------------------------
+  // Static "what this node does" copy (always available on click)
+  // ---------------------------------------------------------------
+  const NODE_INFO = {
+    agent: "agent\n\nCalls the LLM (via the vendor-agnostic get_llm() factory) bound to two tools: retrieve_context and run_tests. Loops here until it responds without a further tool call — that response becomes the proposed fix.",
+    retrieve: "retrieve_context  (RAG)\n\nEmbeds the query and searches a Chroma index built over the target repo's Python source, so the fix is grounded in real code instead of a guess.",
+    run_tests: "run_tests\n\nShells out to pytest against the target repo and returns the real pass/fail output — not a mocked result.",
+    guardrail: "guardrail_check\n\nScans the proposed fix text for risky patterns (DROP TABLE, rm -rf, DELETE FROM, TRUNCATE). A match blocks the run outright; a clean fix proceeds to human approval.",
+    human_gate: "human approval  (interrupt_before)\n\nLangGraph pauses execution here via interrupt_before=[\"apply_fix\"] — this is the framework's own resume primitive, not a hand-rolled polling loop. The API layer resumes with graph.invoke(None, config) on approval.",
+    blocked: "blocked\n\nRun ends here. The fix never reaches a human — an unsafe change shouldn't cost anyone review time.",
+    apply_fix: "apply_fix\n\nOnly reached after a resumed, approved run. Checked again against RBAC here too (defense in depth) — restricted to the 'maintainer' role.",
+    denied: "denied\n\nA human rejected the proposed fix. The graph is never resumed into apply_fix; the run ends here and gets logged.",
+  };
+
+  function showStepDetail(key, liveAppendText) {
+    const content = document.getElementById("step-detail-content");
+    let text = NODE_INFO[key] || "";
+    if (liveAppendText) text += "\n\n— this run —\n" + liveAppendText;
+    content.textContent = text;
+  }
+
+  function setNodeState(key, cls) {
+    const { circle, label } = nodeEls[key];
+    circle.setAttribute("class", "node-circle" + (cls ? " " + cls : ""));
+    label.setAttribute("class", "node-label" + (cls ? " active-label" : ""));
+  }
+
+  function markVisited(key) {
+    const { circle, label } = nodeEls[key];
+    circle.setAttribute("class", "node-circle visited");
+    label.setAttribute("class", "node-label");
+  }
+
+  function resetGraph() {
+    Object.keys(NODES).forEach((k) => setNodeState(k, ""));
+    pulse.style.opacity = 0;
+  }
+
+  function animatePulse(fromKey, toKey, duration) {
+    return new Promise((resolve) => {
+      const a = NODES[fromKey], b = NODES[toKey];
+      const start = performance.now();
+      pulse.style.opacity = 1;
+      function frame(now) {
+        const t = Math.min(1, (now - start) / duration);
+        const dx = (b.x - a.x) * 0.5;
+        const x1 = a.x, y1 = a.y, x2 = a.x + dx, y2 = a.y, x3 = b.x - dx, y3 = b.y, x4 = b.x, y4 = b.y;
+        const mt = 1 - t;
+        const px = mt*mt*mt*x1 + 3*mt*mt*t*x2 + 3*mt*t*t*x3 + t*t*t*x4;
+        const py = mt*mt*mt*y1 + 3*mt*mt*t*y2 + 3*mt*t*t*y3 + t*t*t*y4;
+        pulse.setAttribute("cx", px);
+        pulse.setAttribute("cy", py);
+        if (t < 1) requestAnimationFrame(frame);
+        else { pulse.style.opacity = 0; resolve(); }
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // Audit ticker
+  // ---------------------------------------------------------------
+  const ticker = document.getElementById("audit-ticker");
+  function addAudit(kind, text) {
+    const line = document.createElement("div");
+    line.className = "audit-line " + kind;
+    line.innerHTML = text;
+    ticker.prepend(line);
+  }
+  function clearAudit() { ticker.innerHTML = ""; }
+
+  // ---------------------------------------------------------------
+  // Run status pill
+  // ---------------------------------------------------------------
+  const statusEl = document.getElementById("run-status");
+  function setStatus(cls, text) {
+    statusEl.className = "run-status mono" + (cls ? " " + cls : "");
+    statusEl.innerHTML = '<span class="dot"></span>' + text;
+  }
+
+  // ---------------------------------------------------------------
+  // Demo scripts
+  // ---------------------------------------------------------------
+  const SCRIPTS = {
+    safe: {
+      diff: "checkout_flow_test intermittently times out waiting for #submit-btn under CI load.",
+      steps: [
+        { node: "agent", detail: "Reading PR diff. Deciding to retrieve related code before proposing anything." },
+        { node: "retrieve", detail: "query='checkout submit button timeout'\nmatched: tests/checkout_flow_test.py, src/checkout/submit_handler.js\nfinding: no explicit wait condition before the click; button becomes interactive ~400ms after render." },
+        { node: "agent", detail: "Grounded in the retrieved code. Deciding to confirm the current failure before proposing a fix." },
+        { node: "run_tests", detail: "$ pytest tests/checkout_flow_test.py -q\n1 failed in 6.02s — TimeoutError: element #submit-btn not clickable after 5000ms" },
+        { node: "agent", detail: "Proposed fix: add an explicit wait for #submit-btn's enabled state before clicking, and raise the client timeout from 5s to 15s to absorb CI load variance. File: tests/checkout_flow_test.py." },
+        { node: "guardrail", detail: "Scanned for risky patterns (DROP TABLE, rm -rf, DELETE FROM, TRUNCATE) — none found. Guardrail passed.", audit: ["allow", "<b>guardrail_check</b> passed=true"] },
+        { node: "human_gate", detail: "Execution paused before apply_fix (interrupt_before). Waiting for a maintainer to approve or deny.", audit: ["pending", "<b>human_approval_requested</b> run=demo-safe-01"] },
+      ],
+    },
+    risky: {
+      diff: "Quick fix for the failing migration test: DROP TABLE sessions; then recreate it.",
+      steps: [
+        { node: "agent", detail: "Reading PR diff. The suggested approach involves dropping a table — flagging internally for the guardrail to review." },
+        { node: "retrieve", detail: "query='sessions table migration test'\nmatched: migrations/0042_sessions.py, tests/db_migration_test.py" },
+        { node: "agent", detail: "Formulating a fix based on the diff's own suggestion: drop and recreate the sessions table." },
+        { node: "run_tests", detail: "$ pytest tests/db_migration_test.py -q\n1 failed in 2.14s — ConnectionRefusedError: Postgres not ready (startup race condition)" },
+        { node: "agent", detail: "Proposed fix: DROP TABLE sessions; then run the migration again to recreate it." },
+        { node: "guardrail", detail: "Scanned for risky patterns — matched 'DROP TABLE'. Guardrail blocked the run before it could reach a human.", audit: ["deny", "<b>guardrail_check</b> passed=false — matched 'drop table'"] },
+      ],
+    },
+  };
+
+  let currentScenario = "safe";
+  let running = false;
+
+  document.getElementById("scenario-safe").addEventListener("click", () => selectScenario("safe"));
+  document.getElementById("scenario-risky").addEventListener("click", () => selectScenario("risky"));
+
+  function selectScenario(name) {
+    if (running) return;
+    currentScenario = name;
+    document.getElementById("scenario-safe").classList.toggle("active", name === "safe");
+    document.getElementById("scenario-risky").classList.toggle("active", name === "risky");
+    resetGraph();
+    clearAudit();
+    setStatus("", "idle");
+    document.getElementById("approval-content").innerHTML = '<p class="approval-empty">No fix awaiting review yet — run the demo above.</p>';
+    showStepDetail("agent", false);
+  }
+
+  document.getElementById("run-btn").addEventListener("click", runDemo);
+
+  async function runDemo() {
+    if (running) return;
+    running = true;
+    const runBtn = document.getElementById("run-btn");
+    runBtn.disabled = true;
+    resetGraph();
+    clearAudit();
+    document.getElementById("approval-content").innerHTML = '<p class="approval-empty">No fix awaiting review yet — run the demo above.</p>';
+    setStatus("live", "running");
+
+    const script = SCRIPTS[currentScenario];
+    let prevNode = null;
+
+    for (const step of script.steps) {
+      if (prevNode && prevNode !== step.node) {
+        await animatePulse(prevNode, step.node, 650);
+      }
+      if (prevNode) markVisited(prevNode);
+      setNodeState(step.node, "active");
+      showStepDetail(step.node, step.detail);
+      if (step.audit) addAudit(step.audit[0], step.audit[1]);
+      await new Promise((r) => setTimeout(r, 700));
+      prevNode = step.node;
+    }
+
+    if (currentScenario === "risky") {
+      await animatePulse(prevNode, "blocked", 500);
+      markVisited(prevNode);
+      setNodeState("blocked", "rose-active");
+      setStatus("rose", "blocked");
+      addAudit("deny", "<b>run ended</b> — guardrail blocked, never reached a human");
+    } else {
+      setNodeState("human_gate", "amber-active");
+      setStatus("amber", "awaiting approval");
+      renderApprovalCard();
+    }
+
+    runBtn.disabled = false;
+    running = false;
+  }
+
+  function renderApprovalCard() {
+    const content = document.getElementById("approval-content");
+    content.innerHTML = `
+      <div class="approval-card">
+        <span class="role-tag">requires: maintainer role</span>
+        <pre>${escapeHtml(findProposedFix())}</pre>
+        <div class="approval-actions">
+          <button id="approve-btn">Approve &amp; apply</button>
+          <button id="deny-btn">Deny</button>
+        </div>
+      </div>
+    `;
+    document.getElementById("approve-btn").addEventListener("click", () => resolveApproval(true));
+    document.getElementById("deny-btn").addEventListener("click", () => resolveApproval(false));
+  }
+
+  function findProposedFix() {
+    const steps = SCRIPTS[currentScenario].steps;
+    const s = [...steps].reverse().find((s) => s.node === "agent" && s.detail.toLowerCase().includes("proposed fix"));
+    return s ? s.detail : "(no fix text captured)";
+  }
+
+  function escapeHtml(str) {
+    const d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  async function resolveApproval(approved) {
+    document.getElementById("approve-btn").disabled = true;
+    document.getElementById("deny-btn").disabled = true;
+
+    if (approved) {
+      addAudit("approve", "<b>human_approval_resolved</b> decision=approved actor=reviewer");
+      await animatePulse("human_gate", "apply_fix", 550);
+      markVisited("human_gate");
+      setNodeState("apply_fix", "green-active");
+      setStatus("green", "complete");
+      addAudit("allow", "<b>tool_call_authorized</b> tool=apply_fix role=maintainer");
+      document.getElementById("approval-content").innerHTML =
+        '<div class="resolution-note approved">Approved and applied. graph.invoke(None, config) resumed the run past the interrupt; RBAC re-checked apply_fix\'s caller role before executing.</div>';
+    } else {
+      addAudit("deny", "<b>human_approval_resolved</b> decision=denied actor=reviewer");
+      await animatePulse("human_gate", "denied", 550);
+      markVisited("human_gate");
+      setNodeState("denied", "rose-active");
+      setStatus("rose", "denied");
+      document.getElementById("approval-content").innerHTML =
+        '<div class="resolution-note denied">Denied. The graph is never resumed into apply_fix — no code is touched. A revised PR would start a fresh run.</div>';
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Eval chart (hand-rolled SVG bars — output of eval_harness.py)
+  // ---------------------------------------------------------------
+  const EVAL_DATA = [
+    { name: "flaky_checkout_test", latency: 1.8, status: "awaiting_approval" },
+    { name: "risky_fix_blocked", latency: 1.1, status: "blocked" },
+    { name: "viewer_cannot_apply", latency: 2.0, status: "awaiting_approval" },
+  ];
+
+  (function drawEvalChart() {
+    const chart = document.getElementById("eval-chart");
+    const maxLatency = Math.max(...EVAL_DATA.map((d) => d.latency));
+    const barH = 30, gap = 22, top = 14, chartW = 640, leftPad = 260;
+
+    EVAL_DATA.forEach((d, i) => {
+      const y = top + i * (barH + gap);
+      const w = (d.latency / maxLatency) * chartW;
+
+      const label = el("text", { class: "eval-bar-label", x: 0, y: y + barH / 2 + 4 });
+      label.textContent = d.name;
+      chart.appendChild(label);
+
+      const track = el("rect", { x: leftPad, y, width: chartW, height: barH, rx: 2, fill: "var(--panel-raised)" });
+      // rect fill doesn't accept CSS vars directly in some renderers via attribute; set via style instead
+      track.setAttribute("fill", "#1c232e");
+      chart.appendChild(track);
+
+      const bar = el("rect", { x: leftPad, y, width: 0, height: barH, rx: 2 });
+      const colorMap = { awaiting_approval: "#e8a33d", blocked: "#e2607a", complete: "#6fcf97" };
+      bar.setAttribute("fill", colorMap[d.status] || "#4fd8c4");
+      chart.appendChild(bar);
+      requestAnimationFrame(() => {
+        bar.style.transition = "width 700ms ease";
+        bar.setAttribute("width", w);
+      });
+
+      const value = el("text", { class: "eval-bar-value", x: leftPad + chartW + 12, y: y + barH / 2 + 4 });
+      value.textContent = d.latency.toFixed(1) + "s · " + d.status;
+      chart.appendChild(value);
+    });
+  })();
+
+  // initial state
+  showStepDetail("agent", false);
+})();
+</script>
+</body>
+</html>

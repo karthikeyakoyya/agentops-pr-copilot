@@ -1,0 +1,10 @@
+﻿venv/
+__pycache__/
+*.pyc
+.env
+.chroma_repo/
+audit_log.jsonl
+traces/
+eval_results.json
+*.egg-info/
+.pytest_cache/
