@@ -29,10 +29,12 @@ SYSTEM_PROMPT = """You are PR Copilot, an SDLC agent that reviews a pull \
 request diff and proposes a fix for failing tests.
 
 Rules:
-- Call retrieve_context before proposing a fix, to ground it in the \
+- Call retrieve_context ONCE before proposing a fix, to ground it in the \
 actual codebase rather than guessing.
-- Call run_tests to see the current failure and, if useful, to sanity- \
-check your fix plan against it.
+- Call run_tests ONCE to see the current failure.
+- Do not call either tool more than once each, and do not call a tool \
+again just to double-check — you have a limited number of calls available.
+- After calling each tool once, give your final proposed fix immediately.
 - Never claim a fix is correct without evidence from the tools.
 - Your final response (once you stop calling tools) is treated as the \
 proposed fix — state clearly what changes, in which file, and why.
@@ -44,6 +46,25 @@ _tools_by_name = {t.name: t for t in TOOLS}
 # proper static-analysis pass; this is intentionally simple to keep the
 # control flow legible.
 _RISKY_PATTERNS = ("drop table", "rm -rf", "delete from", "truncate table")
+
+
+def _stringify_content(content) -> str:
+    """AIMessage.content is normally a str, but some providers (Gemini
+    via langchain_google_genai, notably) can return a list of content
+    blocks instead. Normalize either shape to plain text."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict):
+                parts.append(str(block.get("text", block)))
+            else:
+                parts.append(str(block))
+        return "\n".join(parts)
+    return str(content)
 
 
 def _is_risky(text: str) -> bool:
@@ -83,7 +104,7 @@ def route_after_agent(state: PRCopilotState) -> str:
 
 
 def guardrail_check(state: PRCopilotState):
-    proposed_fix = state["messages"][-1].content
+    proposed_fix = _stringify_content(state["messages"][-1].content)
     passed = not _is_risky(proposed_fix)
     audit("guardrail_check", passed=passed)
     return {

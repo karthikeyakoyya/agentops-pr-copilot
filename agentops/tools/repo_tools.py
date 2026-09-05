@@ -14,6 +14,8 @@ from langchain_core.tools import tool
 
 _vectorstore_cache: dict[str, object] = {}
 
+EXCLUDE_DIRS = {"venv", ".venv", ".git", "__pycache__", "node_modules", ".chroma_repo", "traces"}
+
 
 def _get_vectorstore(repo_path: str):
     """Lazily build (and cache per repo_path) a Chroma index of the
@@ -32,15 +34,14 @@ def _get_vectorstore(repo_path: str):
 
         embeddings = OpenAIEmbeddings(model=os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small"))
     else:
-        # No first-party Anthropic embeddings API yet — default to a
-        # local sentence-transformers model so RAG works end-to-end
-        # without an OpenAI key.
         from langchain_huggingface import HuggingFaceEmbeddings
 
         embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
     docs = []
     for path in glob.glob(os.path.join(repo_path, "**", "*.py"), recursive=True):
+        if any(part in EXCLUDE_DIRS for part in path.split(os.sep)):
+            continue
         try:
             with open(path, encoding="utf-8") as f:
                 docs.append(Document(page_content=f.read(), metadata={"path": path}))

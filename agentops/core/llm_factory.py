@@ -20,15 +20,22 @@ def get_llm(temperature: float = 0.0):
             temperature=temperature,
         )
 
-    if provider == "openai":
-        from langchain_openai import ChatOpenAI
+    if provider == "google":
+        from langchain_google_genai import ChatGoogleGenerativeAI
 
-        return ChatOpenAI(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        return ChatGoogleGenerativeAI(
+            model=os.getenv("GOOGLE_MODEL", "gemini-3.5-flash"),
+            temperature=temperature,
+        )    
+    if provider == "google":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        return ChatGoogleGenerativeAI(
+            model=os.getenv("GOOGLE_MODEL", "gemini-2.0-flash"),
             temperature=temperature,
         )
 
     raise ValueError(
-        f"Unsupported LLM_PROVIDER '{provider}'. Set it to 'anthropic' or "
+        f"Unsupported LLM_PROVIDER '{provider}'. Set it to 'anthropic', 'openai', or "
         "'openai', or add a new branch to get_llm()."
     )

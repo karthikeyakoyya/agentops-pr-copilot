@@ -18,6 +18,8 @@ that's expected; wire your key via .env before running it.
 import json
 import time
 import uuid
+from dotenv import load_dotenv
+load_dotenv()
 
 from langchain_core.messages import HumanMessage
 
