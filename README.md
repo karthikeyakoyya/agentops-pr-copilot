@@ -1,4 +1,4 @@
-# AgentOps — PR Copilot
+# AgentOps  PR Copilot
 
 A platform-agnostic, governed LangGraph agent SDK, with a flagship reference agent (**PR Copilot**) that reviews a pull request: retrieves relevant code (RAG), runs the real test suite, proposes a fix, checks it against a safety guardrail, and **pauses for human approval** before it's allowed to touch the repo. Includes a live animated console that visualizes a run end to end.
 
@@ -32,9 +32,8 @@ Don't call this "deployed" or "in production" until you've actually done that wo
 | API design / microservices / SDK | `agentops/api/main.py` (FastAPI), packaged as `agentops-sdk` via `pyproject.toml` | Yes, app boots, non-LLM routes verified |
 | Agent evaluation / observability | `agentops/eval_harness.py`, uses `graph.stream(stream_mode="updates")`, exports traces | Written correctly against LangGraph's stream API; not run (needs LLM key) |
 | Governance, guardrails, access control, auditability, human oversight | `core/governance.py` (RBAC + audit log), `_is_risky()` guardrail, `interrupt_before=["apply_fix"]` as the human-oversight gate | Yes, all four paths (safe/approved, safe/denied, risky/blocked, viewer/RBAC-denied) verified end to end |
-
 ## Project layout
-
+```
 agentops-pr-copilot/
 ├── agentops/
 │ ├── core/
@@ -55,9 +54,9 @@ agentops-pr-copilot/
 ├── .github/workflows/ci.yml # runs pytest on push
 ├── pyproject.toml # packaged as agentops-sdk
 └── .env.example
+```
 
-
-## Running it
+# Running it
 
 ```bash
 cp .env.example .env        # fill in ANTHROPIC_API_KEY or OPENAI_API_KEY
